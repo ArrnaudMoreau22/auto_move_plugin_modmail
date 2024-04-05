@@ -1,0 +1,93 @@
+import discord
+from discord.ext import commands
+from core import checks
+from core.models import PermissionLevel
+
+class AutoMove(commands.Cog):
+    """Automatically moves discussion threads based on activity."""
+
+    def __init__(self, bot):
+        self.bot = bot
+        self.db = bot.plugin_db.get_partition(self)
+        bot.loop.create_task(self.ensure_config_keys())
+
+    async def ensure_config_keys(self):
+        """Ensures that all necessary configuration keys exist."""
+        default_keys = {
+            "waiting_user_message_category_id": None,
+            "waiting_staff_message_category_id": None,
+        }
+        for key, default_value in default_keys.items():
+            if await self.get_config(key) is None:
+                await self.set_config(key, default_value)
+
+    async def get_config(self, key):
+        """Retrieves a specific configuration."""
+        config = await self.db.find_one({"_id": key})
+        return config['value'] if config else None
+
+    async def set_config(self, key, value):
+        """Updates a specific configuration."""
+        await self.db.find_one_and_update({"_id": key}, {"$set": {"value": value}}, upsert=True)
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        """Triggers when the bot is ready."""
+        await self.ensure_config_keys()
+
+    @commands.command(name='initinfo', help='Displays commands for initializing ID variables.')
+    @checks.has_permissions(PermissionLevel.ADMINISTRATOR)
+    async def display_init_info(self, ctx):
+        """Displays initialization information to configure necessary IDs."""
+        embed = discord.Embed(title="Initialization of IDs",
+                              description="Use the following commands to configure necessary IDs.",
+                              color=discord.Color.blue())
+        embed.add_field(name="Set User Message Category ID", value="`?setwaitingusermessagecategory [ID]`", inline=False)
+        embed.add_field(name="Set Staff Message Category ID", value="`?setwaitingstaffmessagecategory [ID]`", inline=False)
+        embed.set_footer(text="Replace [ID] with the actual ID of each category or role.")
+
+        await ctx.send(embed=embed)
+
+    async def move_channel(self, channel, category_id):
+        """Moves a channel to a specified category."""
+        category_id = int(category_id)
+        target_category = self.bot.get_channel(category_id)
+        if target_category and channel.category_id != category_id:
+            try:
+                await channel.edit(category=target_category)
+            except Exception as e:
+                print(f"Failed to move the channel: {e}")
+
+    @commands.command(name='setwaitingusermessagecategory')
+    @checks.has_permissions(PermissionLevel.ADMINISTRATOR)
+    async def set_waiting_user_message_category(self, ctx, category_id: int):
+        """Sets the ID for the category for user messages awaiting response."""
+        await self.set_config('waiting_user_message_category_id', str(category_id))
+        await ctx.send(f'User message waiting category ID updated successfully: <#{category_id}>.')
+
+    @commands.command(name='setwaitingstaffmessagecategory')
+    @checks.has_permissions(PermissionLevel.ADMINISTRATOR)
+    async def set_waiting_staff_message_category(self, ctx, category_id: int):
+        """Sets the ID for the category for staff messages awaiting response."""
+        await self.set_config('waiting_staff_message_category_id', str(category_id))
+        await ctx.send(f'Staff message waiting category ID updated successfully: <#{category_id}>.')
+
+    async def has_mod_replied(self, thread):
+        async for message in thread.channel.history():
+            for embed in message.embeds:
+                if embed.color.value == 3066993:
+                    return True
+        return False
+    
+    @commands.Cog.listener()
+    async def on_thread_reply(self, thread, from_mod, message, anonymous, plain):
+        if not await self.has_mod_replied(thread):
+            return
+
+        category_id = await self.get_config("waiting_user_message_category_id") if from_mod else await self.get_config("waiting_staff_message_category_id")
+        if category_id:
+            await self.move_channel(thread.channel, category_id)
+
+async def setup(bot):
+    """Necessary function to load the Cog."""
+    await bot.add_cog(AutoMove(bot))
