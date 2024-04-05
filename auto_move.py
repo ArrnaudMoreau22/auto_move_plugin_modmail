@@ -30,6 +30,10 @@ class AutoMove(commands.Cog):
         """Updates a specific configuration."""
         await self.db.find_one_and_update({"_id": key}, {"$set": {"value": value}}, upsert=True)
 
+    async def get_global_config(self, key):
+        """Retrieves a specific configuration from the global configuration."""
+        return self.bot.config.get(key)
+
     @commands.Cog.listener()
     async def on_ready(self):
         """Triggers when the bot is ready."""
@@ -73,18 +77,23 @@ class AutoMove(commands.Cog):
         await ctx.send(f'Staff message waiting category ID updated successfully: <#{category_id}>.')
 
     async def has_mod_replied(self, thread):
+        mod_color = await self.get_global_config("mod_color")
         async for message in thread.channel.history():
             for embed in message.embeds:
-                if embed.color.value == 3066993:
+                if embed.color.value == mod_color:
                     return True
         return False
     
     @commands.Cog.listener()
     async def on_thread_reply(self, thread, from_mod, message, anonymous, plain):
-        if not await self.has_mod_replied(thread):
-            return
-
-        category_id = await self.get_config("waiting_user_message_category_id") if from_mod else await self.get_config("waiting_staff_message_category_id")
+        mod_has_replied = await self.has_mod_replied(thread)
+        category_id = None
+        if from_mod:
+            category_id = await self.get_config("waiting_user_message_category_id")
+        else:
+            if mod_has_replied:
+                category_id = await self.get_config("waiting_staff_message_category_id")
+            
         if category_id:
             await self.move_channel(thread.channel, category_id)
 
