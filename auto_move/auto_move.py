@@ -69,7 +69,6 @@ class AutoMove(commands.Cog):
     async def move_to_closing_category(self, ctx):
         """Moves the current thread to the closing category."""
         thread = await self.bot.threads.find(channel=ctx.channel)
-
         if thread:
             category_id = await self.get_config("closing_category_id")
             
@@ -113,12 +112,8 @@ class AutoMove(commands.Cog):
     @commands.Cog.listener()
     async def on_thread_reply(self, thread, from_mod, message, anonymous, plain):
         mod_has_replied = await self.has_mod_replied(thread)
-        isClosingMsg = await self.isClosingMsg(thread)
         category_id = None
         if from_mod:
-            if isClosingMsg:
-                category_id = await self.get_config("closing_category_id")
-            else:
                 category_id = await self.get_config("waiting_user_message_category_id")
         else:
             if mod_has_replied:
