@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands
 from core import checks
 from core.models import PermissionLevel
+import asyncio
 
 class AutoMove(commands.Cog):
     """Automatically moves discussion threads based on activity."""
@@ -41,7 +42,7 @@ class AutoMove(commands.Cog):
         await self.ensure_config_keys()
 
     @commands.command(name='initinfo', help='Displays commands for initializing ID variables.')
-    @checks.has_permissions(PermissionLevel.ADMINISTRATOR)
+    @checks.has_permissions(PermissionLevel.MODERATOR)
     async def display_init_info(self, ctx):
         """Displays initialization information to configure necessary IDs."""
         embed = discord.Embed(title="Initialization of IDs",
@@ -65,9 +66,10 @@ class AutoMove(commands.Cog):
                 print(f"Failed to move the channel: {e}")
 
     @commands.command(name='movetoclosingcategory')
-    @checks.has_permissions(PermissionLevel.ADMINISTRATOR)
+    @checks.has_permissions(PermissionLevel.MODERATOR)
     async def move_to_closing_category(self, ctx):
         """Moves the current thread to the closing category."""
+        await asyncio.sleep(5)
         thread = await self.bot.threads.find(channel=ctx.channel)
         if thread:
             category_id = await self.get_config("closing_category_id")
