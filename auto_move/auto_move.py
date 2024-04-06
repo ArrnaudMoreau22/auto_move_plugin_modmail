@@ -16,6 +16,7 @@ class AutoMove(commands.Cog):
         default_keys = {
             "waiting_user_message_category_id": None,
             "waiting_staff_message_category_id": None,
+            "closing_category_id": None,
         }
         for key, default_value in default_keys.items():
             if await self.get_config(key) is None:
@@ -48,6 +49,7 @@ class AutoMove(commands.Cog):
                               color=discord.Color.blue())
         embed.add_field(name="Set User Message Category ID", value="`?setwaitingusermessagecategory [ID]`", inline=False)
         embed.add_field(name="Set Staff Message Category ID", value="`?setwaitingstaffmessagecategory [ID]`", inline=False)
+        embed.add_field(name="Set Closing Category ID", value="`?setclosingcategory [ID]`", inline=False)
         embed.set_footer(text="Replace [ID] with the actual ID of each category or role.")
 
         await ctx.send(embed=embed)
@@ -61,6 +63,23 @@ class AutoMove(commands.Cog):
                 await channel.edit(category=target_category)
             except Exception as e:
                 print(f"Failed to move the channel: {e}")
+
+    @commands.command(name='movetoclosingcategory')
+    @checks.has_permissions(PermissionLevel.ADMINISTRATOR)
+    async def move_to_closing_category(self, ctx):
+        """Moves the current thread to the closing category."""
+        thread = await self.bot.threads.find(channel=ctx.channel)
+
+        if thread:
+            category_id = await self.get_config("closing_category_id")
+            
+            if category_id is not None:
+                await self.move_channel(thread.channel, category_id)
+            else:
+                await ctx.send('The closing category ID is not configured.')
+        else:
+            await ctx.send('This command must be used in a thread channel.')
+
 
     @commands.command(name='setwaitingusermessagecategory')
     @checks.has_permissions(PermissionLevel.ADMINISTRATOR)
@@ -76,6 +95,13 @@ class AutoMove(commands.Cog):
         await self.set_config('waiting_staff_message_category_id', str(category_id))
         await ctx.send(f'Staff message waiting category ID updated successfully: <#{category_id}>.')
 
+    @commands.command(name='setclosingcategory')
+    @checks.has_permissions(PermissionLevel.ADMINISTRATOR)
+    async def set_closing_category(self, ctx, category_id: int):
+        """Sets the ID for the category for closing threads."""
+        await self.set_config('closing_category_id', str(category_id))
+        await ctx.send(f'Closing category ID updated successfully: <#{category_id}>.')
+
     async def has_mod_replied(self, thread):
         mod_color = await self.get_global_config("mod_color")
         async for message in thread.channel.history():
@@ -87,9 +113,13 @@ class AutoMove(commands.Cog):
     @commands.Cog.listener()
     async def on_thread_reply(self, thread, from_mod, message, anonymous, plain):
         mod_has_replied = await self.has_mod_replied(thread)
+        isClosingMsg = await self.isClosingMsg(thread)
         category_id = None
         if from_mod:
-            category_id = await self.get_config("waiting_user_message_category_id")
+            if isClosingMsg:
+                category_id = await self.get_config("closing_category_id")
+            else:
+                category_id = await self.get_config("waiting_user_message_category_id")
         else:
             if mod_has_replied:
                 category_id = await self.get_config("waiting_staff_message_category_id")
