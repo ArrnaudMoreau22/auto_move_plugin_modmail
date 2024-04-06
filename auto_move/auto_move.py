@@ -69,7 +69,7 @@ class AutoMove(commands.Cog):
     @checks.has_permissions(PermissionLevel.MODERATOR)
     async def move_to_closing_category(self, ctx):
         """Moves the current thread to the closing category."""
-        await asyncio.sleep(5)
+        await asyncio.sleep(3)
         thread = await self.bot.threads.find(channel=ctx.channel)
         if thread:
             category_id = await self.get_config("closing_category_id")
