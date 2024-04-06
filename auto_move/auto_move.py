@@ -125,7 +125,7 @@ class AutoMove(commands.Cog):
         mod_has_replied = await self.has_mod_replied(thread)
         recruitment_category_id = await self.get_config("recruitment_id")
         category_id = None
-        if thread.channel.category_id == int(recruitment_category_id):
+        if recruitment_category_id and thread.channel.category_id == int(recruitment_category_id):
             return
 
         if from_mod:
