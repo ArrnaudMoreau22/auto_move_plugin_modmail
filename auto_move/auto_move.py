@@ -18,6 +18,7 @@ class AutoMove(commands.Cog):
             "waiting_user_message_category_id": None,
             "waiting_staff_message_category_id": None,
             "closing_category_id": None,
+            "recruitment_id": None,
         }
         for key, default_value in default_keys.items():
             if await self.get_config(key) is None:
@@ -51,6 +52,7 @@ class AutoMove(commands.Cog):
         embed.add_field(name="Set User Message Category ID", value="`?setwaitingusermessagecategory [ID]`", inline=False)
         embed.add_field(name="Set Staff Message Category ID", value="`?setwaitingstaffmessagecategory [ID]`", inline=False)
         embed.add_field(name="Set Closing Category ID", value="`?setclosingcategory [ID]`", inline=False)
+        embed.set_field(3, name="Set Recruitment Category ID", value="`?setrecruitmentcategory [ID]`", inline=False)
         embed.set_footer(text="Replace [ID] with the actual ID of each category or role.")
 
         await ctx.send(embed=embed)
@@ -103,6 +105,13 @@ class AutoMove(commands.Cog):
         await self.set_config('closing_category_id', str(category_id))
         await ctx.send(f'Closing category ID updated successfully: <#{category_id}>.')
 
+    @commands.command(name='setrecruitmentcategory')
+    @checks.has_permissions(PermissionLevel.ADMINISTRATOR)
+    async def set_recruitment_category(self, ctx, category_id: int):
+        """Sets the ID for the category for recruitment threads."""
+        await self.set_config('recruitment_id', str(category_id))
+        await ctx.send(f'Recruitment category ID updated successfully: <#{category_id}>.')
+
     async def has_mod_replied(self, thread):
         mod_color = await self.get_global_config("mod_color")
         async for message in thread.channel.history():
@@ -114,7 +123,11 @@ class AutoMove(commands.Cog):
     @commands.Cog.listener()
     async def on_thread_reply(self, thread, from_mod, message, anonymous, plain):
         mod_has_replied = await self.has_mod_replied(thread)
+        recruitment_category_id = await self.get_config("recruitment_id")
         category_id = None
+        if thread.channel.category_id == int(recruitment_category_id):
+            return
+
         if from_mod:
                 category_id = await self.get_config("waiting_user_message_category_id")
         else:
